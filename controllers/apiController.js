@@ -1,6 +1,7 @@
 const rp = require('request-promise');
 const _ = require('lodash');
-const noop = () => {};
+const noop = () => {
+};
 
 const googleSpeedCheckUrl = 'https://www.googleapis.com/pagespeedonline/v4/runPagespeed';
 const googleApiKey = 'AIzaSyCU16wC-50rZn9awSvSNJLQHt_eEslIyAc';
@@ -41,43 +42,40 @@ function validBody(req) {
 }
 
 function speedCheckLinks(urlArray, cb) {
-    if (!_.isArray(urlArray)) urlArray = [ urlArray ]; // Convert string to array using lodash array check
+    if (!_.isArray(urlArray)) urlArray = [urlArray]; // Convert string to array using lodash array check
 
-    let speedCheckPromises = [];
     let response = {
         sites: []
     };
 
-    // For every url in the list of urls provided in the request, do a speed check and return them all once done
-    _.forEach(urlArray, url => {
+    let speedCheckPromises = urlArray.map(url => {
+        // For every url in the list of urls provided in the request, do a speed check and return them all once done
         if (!url.includes('http')) url = 'http://' + url;
 
         let options = {
             uri: googleSpeedCheckUrl,
-            qs: { url, key: googleApiKey },
+            qs: {url, key: googleApiKey},
             json: true
         };
 
-        rp(options)
-            .then(function (res) {
-                speedCheckPromises.push(res);
+        return rp(options);
+    });
 
-                if (speedCheckPromises.length === urlArray.length) {
-                    _.forEach(speedCheckPromises, speedCheckResult => {
-                        response.sites.push({
-                            title: speedCheckResult.title,
-                            response_code: speedCheckResult.responseCode,
-                            speed_score: speedCheckResult.ruleGroups.SPEED.score,
-                            url: speedCheckResult.id
-                        });
-                    });
+    Promise.all(speedCheckPromises).then((results => {
+        console.log(results.length);
 
-                    cb(null, response);
-                }
-            })
-            .catch(function (err) {
-                cb(err);
+        _.forEach(results, result => {
+            response.sites.push({
+                title: result.title,
+                response_code: result.responseCode,
+                speed_score: result.ruleGroups.SPEED.score,
+                url: result.id
             });
+        });
+
+        cb(null, response);
+    })).catch(err => {
+        cb(err);
     });
 }
 
